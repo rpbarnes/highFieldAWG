@@ -23,16 +23,16 @@ def dataToCSV(dataWriter, fileName,flag = 'wb'):
 
 
 close('all')
-fullPath = '/Users/StupidRobot/exp_data/ryan_HFAWG/AWGHighField/'
+fullPath = r'e:\\'
 outputData = 'AWG_phase_amplitude_array_196.4911GHZ.dat'
-loadTrace = False
+loadTrace = True
 debug = True
 reCalcData = True
 #inputData = 'PulseAmplitudeCalibrationDigitalAmplitudes.csv'
 ### make data set to throw all data#{{{
 resolution = 64
 ampArray = linspace(.3,.41,resolution)
-phaseArray = linspace(-pi,pi,resolution)
+phaseArray = linspace(-pi/16.,pi/16.,resolution)
 
 ### load in the data sets.#{{{
 # the output data in the .dat file
@@ -108,7 +108,6 @@ pys.savefig('digPhaseAmpOutAmp.png')
 pys.show()
 
 
-data.
 # save things to csv
 #dataWriter = [('real','imag','digAmp')] + zip(list(expDigComp.runcopy(real).data),list(expDigComp.runcopy(imag).data),list(expDigComp.getaxis('digAmp'))) 
 #dataToCSV(dataWriter,'outputAmplitude.csv')

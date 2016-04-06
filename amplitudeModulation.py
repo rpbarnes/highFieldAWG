@@ -32,16 +32,26 @@ outputDataFile = 'outputAmplitude.csv'
 pys.ion()
 
 # constants
+debug = True
 dynamicRangeMin = 0.3 # This is where the modulation starts.
 dynamicRangeMax = 0.41
-freqOffset = 10e6 #Hz
-freqWidth = 10e6 # Hz, I run plus and minus this width. This is also the width at 200 GHz, I scale approprately in code.
+freqOffset = 1e6 #Hz
+freqWidth = 1e6 # Hz, I run plus and minus this width. This is also the width at 200 GHz, I scale approprately in code.
 chirpLength = 10e-6 # seconds
 amplitudeScalingFactor = 0.37
 
 wave = p.make_highres_waveform([('rect',0,chirpLength+1e-6)],resolution = 1e-9)
 
+timeAxis = r_[0:chirpLength:1e-9]
+freqWidth /= 16.
+rate = 2*freqWidth/chirpLength
+# this is the phase modulation
+modulation = pys.nddata(2*pi*(-freqWidth*timeAxis + rate/2*timeAxis**2)).rename('value','t').labels(['t'],[timeAxis])
+# this is the frequency modulation
+chirp = pys.nddata(exp(1j*modulation.data)).rename('value','t').labels(['t'],[timeAxis])
+planeWave = pys.nddata(exp(1j*2*pi*freqOffset*timeAxis)).rename('value','t').labels(['t'],[timeAxis])
 
+#{{{
 outputData = pullCsvData(outputDataFile,3)
 outputData = pys.nddata(outputData[:,0]+1j*outputData[:,1]).rename('value','digAmp').labels('digAmp',outputData[:,2])
 # take only what we can use and set to full scale
@@ -58,17 +68,7 @@ outputClean.data = arctan2(outputClean.runcopy(imag).data,outputClean.runcopy(re
 outputClean.data = unwrap(outputClean.data)
 pys.figure()
 pys.plot(outputClean,'r.')
-pys.title('phase roll')
-
-timeAxis = r_[0:chirpLength:1e-9]
-freqWidth /= 16.
-rate = 2*freqWidth/chirpLength
-# this is the phase modulation
-modulation = pys.nddata(2*pi*(-freqWidth*timeAxis + rate/2*timeAxis**2)).rename('value','t').labels(['t'],[timeAxis])
-# this is the frequency modulation
-chirp = pys.nddata(exp(1j*modulation.data)).rename('value','t').labels(['t'],[timeAxis])
-planeWave = pys.nddata(exp(1j*2*pi*freqOffset*timeAxis)).rename('value','t').labels(['t'],[timeAxis])
-
+pys.title('phase roll')#}}}
 # amplitude modulation
 sinMod = pys.nddata(sin(pi/chirpLength*timeAxis)).rename('value','t').labels(['t'],[timeAxis])
 # the corrected amplitude
@@ -81,19 +81,23 @@ pys.title('phase roll for amplitude input')
 
 # now correct the phase of the chirp pulse
 correctedChirp = chirp.copy()
-correctedChirp.data = chirp.data*exp(1j*phaseRoll.data)
+correctedChirp.data = chirp.data*exp(-1j*phaseRoll.data)
 
 # plot the chirp before frequency offset
-pys.figure()
-pys.plot(sinMod)
-pys.plot(chirp)
-pys.plot(correctedDigAmp)
-pys.plot(correctedChirp)
+if debug:
+	pys.figure()
+	pys.plot(sinMod)
+	pys.plot(chirp)
+	pys.plot(correctedDigAmp)
+	pys.plot(correctedChirp)
 
 toSynthesize = correctedChirp*correctedDigAmp
 pys.figure()
 pys.plot(toSynthesize)
 
 wave['t',0:len(toSynthesize.data)] = toSynthesize.data
+sram = p.wave2sram(wave.data)
+sram[0] |= 0x30000000 # add trigger pulse at beginning of sequence
+p.fpga.dac_run_sram_slave(sram,False)
 
 pys.show()
