@@ -1,6 +1,8 @@
 """
 I generate a lookup table of the relationship of input amp and phase to output amp and phase. I save it as LookupTable.h5/ampPhaseLookup
 
+This will restrict the lookup search trajectory to only look at the next series of positive index from the current phase index where the series is constricted by a pi/16 phase rotation.
+
 """
 
 import matlablike as pys
@@ -17,18 +19,24 @@ from scipy import interpolate
 ion()
 
 pys.close('all')
+
 boundTable = False
 lookupTableFile = 'LookupTable.h5/phase512amp128'
 lookupTable = pys.nddata_hdf5(lookupTableFile)
-lookupTable.data /= lookupTable.data.max()
 preservedTable = lookupTable.copy()
-threshold = 0.01
-#lookupTable = lookupTable['phase',lambda x: abs(x) < (5/2*180.)/16.]
+lookupTable = lookupTable['amp',lambda x: x < .6]
+lookupTable.data /= lookupTable.data.max()
+maxIndexShift=5
+goUp=False
+if goUp:
+    goDown = False
+else:
+    goDown = True
 
 
 ### Input Waveform
 chirpLength = 10e-6
-timeAxis = pys.r_[0:chirpLength:50e-9]
+timeAxis = pys.r_[0:chirpLength:20e-9]
 freqOffset = 0e6
 freqOffsetArray = pys.r_[-freqOffset:freqOffset: 1j]
 freqWidth =    10e6
@@ -63,16 +71,21 @@ for count,dataVal in enumerate(waveform.data):
     else:
         print "%i / %i"%(count+1,totalLength), "looking about index ", currIndex
         currTable = abs(lookupTable.copy() - dataVal)
-        ampVals,phaseVals = where(currTable.data<=tempThreshold) # find values in given range.
-        while len(phaseVals) == 0:
-            print "Temporarily increasing threshold"
-            tempThreshold+=0.01
-            ampVals,phaseVals = where(currTable.data<=tempThreshold) # find values in given range.
-        phaseIndex = argmin(abs(phaseVals-currIndex[1]))    # get index of phase and amp that is closest to previous value.
-        ampIndex = argmin(abs(ampVals-currIndex[0]))
-        currIndex = (ampVals[ampIndex],phaseVals[phaseIndex])                   # reset the index
-        ampList.append(lookupTable.getaxis('amp')[ampVals[ampIndex]])                   # calculate new amplitude and phase values
-        phaseList.append(lookupTable.getaxis('phase')[phaseVals[phaseIndex]])
+        if goUp:
+            if (currIndex[1]+maxIndexShift)>=(len(lookupTable.getaxis('phase'))-1): # If we're at the edge of the array let it roll to the other side.
+                currIndex = (currIndex[0],0)
+            currTable = currTable['phase',currIndex[1]:currIndex[1]+maxIndexShift]
+            minimaIndex = unravel_index(argmin(currTable.runcopy(abs).data),shape(currTable.data)) 
+            currIndex = (minimaIndex[0],minimaIndex[1]+currIndex[1])                        # you cut the phase indecies by currIndex, now add it back
+        if goDown:
+            if (currIndex[1]-maxIndexShift)<=0: # If we're at the edge of the array let it roll to the other side.
+                currIndex = (currIndex[0],len(lookupTable.getaxis('phase'))-1)
+            currTable = currTable['phase',currIndex[1]-maxIndexShift:currIndex[1]]
+            minimaIndex = unravel_index(argmin(currTable.runcopy(abs).data),shape(currTable.data)) 
+            currIndex = (minimaIndex[0],minimaIndex[1]+(currIndex[1]-maxIndexShift))                        # you cut the phase indecies by currIndex, now add it back
+
+        ampList.append(lookupTable.getaxis('amp')[currIndex[0]])                   # calculate new amplitude and phase values
+        phaseList.append(lookupTable.getaxis('phase')[currIndex[1]])
         foundWaveform.append(lookupTable.data[currIndex])
 
 print "Loop took %0.2f seconds"%(time.time()-start)
