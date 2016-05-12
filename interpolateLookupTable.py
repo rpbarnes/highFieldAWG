@@ -16,16 +16,17 @@ except:
 ion()
 
 pys.close('all')
-lookupTableFile = 'LookupTable.h5/AWG_phase_amplitude_array_196.4911GHZ'
+#lookupTableFile = 'LookupTable.h5/AWG_phase_amplitude_array_196.4911GHZ'
+lookupTableFile = 'LookupTable.h5/ampPhaseLookup'
 lookupTable = pys.nddata_hdf5(lookupTableFile)
-lookupTable = lookupTable['phase',lambda x: x > -.06]
+#lookupTable = lookupTable['phase',lambda x: x > -.06]
 
 ### Input Waveform
 chirpLength = 10e-6
 timeAxis = pys.r_[0:chirpLength:1e-9]
-freqOffset = 130e6
+freqOffset = 10e6
 freqOffsetArray = pys.r_[-freqOffset:freqOffset: 1j]
-freqWidth =    100e6
+freqWidth =    10e6
 #freqWidth /= 16.
 rate = 2*freqWidth/chirpLength
 # this is the phase modulation
