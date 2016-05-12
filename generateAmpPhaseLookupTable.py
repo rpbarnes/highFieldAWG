@@ -6,6 +6,7 @@ I measure the amplitude adn phase response of the high field system and now gene
 
 import matlablike as pys
 import csv
+import os
 
 # Write data tuple to csv#{{{
 def dataToCSV(dataWriter, fileName,flag = 'wb'):
@@ -23,26 +24,37 @@ def dataToCSV(dataWriter, fileName,flag = 'wb'):
 
 
 close('all')
-fullPath = r'e:\\'
-outputData = 'AWG_phase_amplitude_array_196.4911GHZ.dat'
+fullPath = r'/Users/StupidRobot/Box Sync/High Field EPR Data/Ilia/160510 AWG SpecMan/'
+outputData = r'steps -16pi to 16pi.dat'
 loadTrace = True
 debug = True
 reCalcData = True
 #inputData = 'PulseAmplitudeCalibrationDigitalAmplitudes.csv'
 ### make data set to throw all data#{{{
-resolution = 64
-ampArray = linspace(.3,.41,resolution)
-phaseArray = linspace(-pi/16.,pi/16.,resolution)
+ampArray=linspace(.3,1,128)
 
 ### load in the data sets.#{{{
 # the output data in the .dat file
 if loadTrace:
     openFile = open(fullPath + outputData,'r+')
     lines = openFile.readlines()
-    lines.pop(0)
+    ### Read in phase values.
+    phases = lines.pop(0)
+    phases = phases.split('\n')[0].split('  ')
+    phases.pop(0)
+    phaseArray = []
+    for count in range(0,len(phases),2):
+        phase = float(phases[count].split('/')[1].split(' ')[0])
+        deg = phases[count].split(' ')[-1]
+        if deg == 'kdeg':
+            phase*=1000.
+        phaseArray.append(phase)
+    phaseArray = array(phaseArray) # this is in degress not radians.
+
     time = []
     data = []
-    for line in lines:
+    for count,line in enumerate(lines):
+        print"parsing data. Line %i out of %i"%(count+1,len(lines))
         line = line.split('\n')[0].split('  ')
         line = filter(None,line)
         time.append(float(line.pop(0))) # it looks that the first item is always the time increment
@@ -50,7 +62,7 @@ if loadTrace:
         for item in line:
             item = item.split(' ')
             indData.append(float(item[0]) + 1j*float(item[1]))
-        data.append(pys.nddata(array(indData)).rename('value','amp').labels('amp',ampArray))
+        data.append(pys.nddata(array(indData)).rename('value','phase').labels('phase',phaseArray))
     output = pys.concat(data,'t').labels('t',array(time))
 
 ## the input data
@@ -62,8 +74,10 @@ if loadTrace:
 #    line = line.split(',')
 #    amplitudeData.append(float(line[0]))#}}}
 
-start = 680e-9
-width = 200e-9
+#output = output['phase',0:2]
+
+start = 13907e-9-(len(ampArray)*100e-9)
+width = 100e-9
 bufferVal = 25e-9
 # now calculate the phase and amplitude of each time increment.
 if reCalcData:
@@ -72,10 +86,11 @@ if reCalcData:
     data.labels(['amp','phase'],[ampArray,phaseArray])#}}}
     expOutput = []
     pys.figure()
-    pys.plot(output['amp',0])
-    for countAmp,amp in enumerate(ampArray):
-        for countPhase,phase in enumerate(phaseArray):
-            currSlice = output['amp',countAmp,'t',lambda x: logical_and(x > start + width*countPhase + bufferVal, x < start + width*(countPhase+1) - bufferVal)]
+    pys.plot(output['phase',0])
+    for countPhase,phase in enumerate(output.getaxis('phase')):
+        print "Analyzing phase %i of %i"%(countPhase,len(output.getaxis('phase')))
+        for countAmp,amp in enumerate(ampArray):
+            currSlice = output['phase',countPhase,'t',lambda x: logical_and(x > start + width*countAmp + bufferVal, x < start + width*(countAmp+1) - bufferVal)]
             data['amp',countAmp,'phase',countPhase] = currSlice.copy().mean('t').data
             if debug:
                 pys.plot(currSlice,'r')
