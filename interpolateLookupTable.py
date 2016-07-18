@@ -17,7 +17,6 @@ from scipy import interpolate
 ion()
 
 pys.close('all')
-
 boundTable = False
 lookupTableFile = 'LookupTable.h5/phase512amp128'
 lookupTable = pys.nddata_hdf5(lookupTableFile)
