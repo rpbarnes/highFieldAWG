@@ -6,16 +6,23 @@ This will restrict the lookup search trajectory to only look at the next series 
 """
 
 import matlablike as pys
-#import labrad
-#import synthesize as s
 from pylab import *
 import time
 from scipy import interpolate
-#try:
-#	p
-#except:
-#	p = s.pulsegen()
-#
+
+try:
+    import labrad
+    FPGAComp=True
+except:
+    FPGAComp=False
+
+if FPGAComp:
+    import synthesize as s
+    try:
+    	p
+    except:
+    	p = s.pulsegen()
+    
 ion()
 
 pys.close('all')
@@ -23,10 +30,13 @@ pys.close('all')
 boundTable = False
 lookupTableFile = 'LookupTable.h5/phase512amp128'
 lookupTable = pys.nddata_hdf5(lookupTableFile)
+ampAxis = pys.linspace(0.35,1,128)
+lookupTable.labels('amp',ampAxis)
 preservedTable = lookupTable.copy()
-lookupTable = lookupTable['amp',lambda x: x < .6]
+lookupTable = lookupTable['amp',lambda x: x < .8]
+#lookupTable = lookupTable['phase',lambda x: logical_and(x > -180./16,x<180./16)]
 lookupTable.data /= lookupTable.data.max()
-maxIndexShift=5
+maxIndexShift=30
 goUp=False
 if goUp:
     goDown = False
@@ -36,10 +46,12 @@ else:
 
 ### Input Waveform
 chirpLength = 10e-6
-timeAxis = pys.r_[0:chirpLength:20e-9]
+timeResolution = 20e-9
+convolveOutput=False
+timeAxis = pys.r_[0:chirpLength+timeResolution:timeResolution]
 freqOffset = 0e6
 freqOffsetArray = pys.r_[-freqOffset:freqOffset: 1j]
-freqWidth =    10e6
+freqWidth = 1e6
 #freqWidth /= 16.
 rate = 2*freqWidth/chirpLength
 # this is the phase modulation
@@ -59,7 +71,6 @@ phaseList = []                                              # Input amplitude an
 ampList = []
 foundWaveform = []
 for count,dataVal in enumerate(waveform.data):
-    tempThreshold = threshold
     if count == 0:
         print "finding first index"
         currTable = abs(lookupTable.copy() - dataVal)
@@ -106,9 +117,31 @@ ylim(ampList.min(),ampList.max())
 xlim(phaseList.min(),phaseList.max())
 
 xbandWave = pys.nddata(array(ampList)*exp(1j*array(phaseList)*pi/180)).rename('value','t').labels('t',waveform.getaxis('t'))
+if convolveOutput:
+    toSynthesize=xbandWave.copy().convolve('t',timeResolution*2)
+else:
+    toSynthesize=xbandWave.copy()
+# splice this into an appropriately sampled waveform
+if FPGAComp:
+    wave=p.make_highres_waveform([('delay',toSynthesize.getaxis('t').max())])
+    wave.ft('t',shift=True)
+    toSynthesize.ft('t',shift=True)
+    dataList = [wave['t',lambda x: x <= toSynthesize.getaxis('t').min()],toSynthesize,wave['t',lambda x: x >= toSynthesize.getaxis('t').max()]]
+    newWave = pys.concat(dataList,'t')
+    newWave = newWave['t',1:-1]
+    newWave.labels('t',wave.getaxis('t'))
+    toSynthesize.ift('t',shift=True)
+    newWave.ift('t',shift=True)
+
+
 figure()
-pys.plot(xbandWave,label='real')
-pys.plot(xbandWave.runcopy(imag),label='imag')
+pys.plot(xbandWave,label='real Rough')
+pys.plot(xbandWave.runcopy(imag),label='imag Rough')
+pys.plot(toSynthesize,label='real Smooth')
+pys.plot(toSynthesize.runcopy(imag),label='imag Smooth')
+if FPGAComp:
+    pys.plot(newWave,label='real SentToDac')
+    pys.plot(newWave.runcopy(imag),label='imag SentToDac')
 legend()
 title('x band waveform')
 
@@ -116,4 +149,12 @@ figure()
 pys.plot(xbandWave.getaxis('t'),arctan2(real(xbandWave.data),imag(xbandWave.data)))
 title('x band phase')
 show()
+
+
+### Synthesize the waveform
+if FPGAComp:
+    sram = p.wave2sram(newWave.data)
+    sram[0] |= 0x30000000 # add trigger pulse at beginning of sequence
+    p.fpga.dac_run_sram_slave(sram,False)
+    print "synthesized waveform"
 

@@ -1,17 +1,23 @@
 import socket
+import time
+from astropy.io import ascii
+from astropy.table import Table,Column
 import synthesize as s
 from pylab import *
 import time
 ion()
 
-makePlots = True        # set to False to prevent plotting the output waveform.
-phaseScaling = True     # set to False to prevent scaling the phase of waveform by 1/16.
+makePlots = False
+phaseScaling = False    # set to False to prevent scaling the phase of waveform by 1/16.
 dwellTime = 1e-9        # set to the dwell time of the FPGA. Must be a multiple of 4 ns.
 localDebug = False      # binds server to local host. False = bound to outside accessible ip. True = bound to localhost.
 dryRun = False          # for debug purposes. Set to False to synthesize waveform. If set to True script will run everything but final waveform synthesis.
+saveWaveforms = False 	# if true this will save the waveform recieved from specman in the folder 'savedWaveforms'
+reprogrammingDelay = False # set to True if you want to hang for the 150 ms reprogramming delay
+reprogrammingTime = 5. # time to reprogram the DAC board.
 
 
-def recvTimeout(Sconn,timeout=.1,verbose=False):
+def recvTimeout(Sconn,timeout=1.,verbose=False):
     Sconn.setblocking(0) # make it so the socket doesn't block
     # put the data together peicewise 
     totalData=[]
@@ -39,7 +45,7 @@ def recvTimeout(Sconn,timeout=.1,verbose=False):
     # return a string of the data
     return ''.join(totalData)
 
-def makeWaveform(incomingString,phaseScaling=True,makePlots=True):
+def makeWaveform(incomingString,phaseScaling=True):
     """ Produce a waveform with modifiers from incoming string recieved by server
         
         args:
@@ -57,9 +63,10 @@ def makeWaveform(incomingString,phaseScaling=True,makePlots=True):
     im = array([float(k) for k in im])
     wave = re+1j*im
     if phaseScaling:
-        phase = unwrap(arctan2(re,im))
+        phase = unwrap(arctan2(im,re))
         phase /= 16.
         newWave = abs(wave)*exp(1j*phase) # normalize by the appropriate amplitude.
+	newWave /= newWave.max()
     else:
         newWave = None 
     return wave,newWave
@@ -85,13 +92,14 @@ while True:
     incoming = recvTimeout(conn,verbose=True)
     print "the length of the waveform recieved is ",len(incoming)
     if len(incoming) > 0:
-        wave,newWave = makeWaveform(incoming,phaseScaling=phaseScaling,makePlots=makePlots)
+        wave,newWave = makeWaveform(incoming,phaseScaling=phaseScaling)
         timeAxis = arange(0,len(wave)*dwellTime,dwellTime)
         if makePlots:
             close('all')
             figure()
             plot(timeAxis,real(wave),label='real')
             plot(timeAxis,imag(wave),label='imag')
+            plot(timeAxis,abs(wave),label='abs')
             legend()
             title('Original Waveform')
             draw()
@@ -99,11 +107,14 @@ while True:
                 figure()
                 plot(timeAxis,real(newWave),label='real')
                 plot(timeAxis,imag(newWave),label='imag')
+                plot(timeAxis,abs(newWave),label='abs')
                 legend()
                 title('Phase Scaled Waveform')
                 draw()
         # synthesize the waveform
         try:
+            # I'm really not sure if this is the right thing to do but for some reason the imag channel is getting flipped.
+            wave = real(wave)-1j*imag(wave)
             if phaseScaling:
                 sram = p.wave2sram(newWave)
             else:
@@ -111,9 +122,20 @@ while True:
             sram[0] |= 0x30000000 # add trigger pulse at beginning of sequence
             if not dryRun:
                 p.fpga.dac_run_sram_slave(sram,False)
+                #p.fpga.dac_run_sram(sram,False)
             else:
                 print "Dry Run. Did not send wave to DAC "
             print "synthesized waveform"
+            if saveWaveforms:
+                fileName = 'savedWaveforms/'+str(time.strftime("%Y-%m-%d_%H-%M"))+'.dat'
+                if phaseScaling:
+                    dataWriter = Table([real(newWave),imag(newWave)],names=['real','imag'])
+                else:
+                    dataWriter = Table([real(wave),imag(wave)],names=['real','imag'])
+                ascii.write(dataWriter,fileName)
+            if reprogrammingDelay:
+                print "Sleeping for %0.3f s for reprogramming the DAC"%reprogrammingTime
+                time.sleep(reprogrammingTime) # sleep for 150 ms.
             conn.send('Waveform Synthesized')
         except Exception as errtxt:
             print errtxt

@@ -6,7 +6,9 @@ I measure the amplitude adn phase response of the high field system and now gene
 
 import matlablike as pys
 import csv
+from pylab import *
 import os
+ion()
 
 # Write data tuple to csv#{{{
 def dataToCSV(dataWriter, fileName,flag = 'wb'):
@@ -24,14 +26,14 @@ def dataToCSV(dataWriter, fileName,flag = 'wb'):
 
 
 close('all')
-fullPath = r'/Users/StupidRobot/Box Sync/High Field EPR Data/Ilia/160510 AWG SpecMan/'
-outputData = r'steps -16pi to 16pi.dat'
-loadTrace = True
-debug = True
+fullPath = r''
+outputData = r'steps Amp 1  to 04  phase -180 to 180 quazi cw.dat'
+loadTrace = False
+debug = False
 reCalcData = True
 #inputData = 'PulseAmplitudeCalibrationDigitalAmplitudes.csv'
 ### make data set to throw all data#{{{
-ampArray=linspace(.3,1,128)
+ampArray = pys.linspace(1.0,.4,128)
 
 ### load in the data sets.#{{{
 # the output data in the .dat file
@@ -64,19 +66,16 @@ if loadTrace:
             indData.append(float(item[0]) + 1j*float(item[1]))
         data.append(pys.nddata(array(indData)).rename('value','phase').labels('phase',phaseArray))
     output = pys.concat(data,'t').labels('t',array(time))
+    saveOutput = output.copy()
 
-## the input data
-#openFile = open(fullPath + inputData,'r+')
-#lines = openFile.readlines()
-#lines.pop(0)
-#amplitudeData = []
-#for line in lines:
-#    line = line.split(',')
-#    amplitudeData.append(float(line[0]))#}}}
 
-#output = output['phase',0:2]
+if debug:
+    output = output['phase',0:2]
+else:
+    output = saveOutput.copy()
 
-start = 13907e-9-(len(ampArray)*100e-9)
+#start = 13822e-9-(len(ampArray)*100e-9)
+start = 1112e-9
 width = 100e-9
 bufferVal = 25e-9
 # now calculate the phase and amplitude of each time increment.
