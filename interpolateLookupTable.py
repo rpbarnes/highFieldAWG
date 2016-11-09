@@ -3,6 +3,43 @@ I generate a lookup table of the relationship of input amp and phase to output a
 
 """
 
+### Set plotting parameters.#{{{
+fig_width = 5.5
+fig_height = 4
+fig_size = [fig_width,fig_height] 
+tick_size = 15 
+fontlabel_size = 'large' 
+params = {'backend': 'wxAgg', 
+        'lines.markersize' : 1,
+        'axes.labelsize': fontlabel_size, 
+        'text.fontsize': fontlabel_size, 
+        'legend.fontsize': fontlabel_size, 
+        'legend.frameon':False,
+        'xtick.labelsize': tick_size, 
+        'ytick.labelsize': tick_size, 
+        'text.usetex': False,
+        'figure.figsize': fig_size}
+
+font = {'family' : 'times new roman',
+        'weight' : 'bold',
+        'size'   : 15}
+pys.rc('font',**font)
+pys.rc("axes", linewidth=2.0)
+pys.rc("lines", markeredgewidth=.5)
+pys.rcParams['mathtext.default'] = 'regular'
+pys.rcParams.update(params)#}}}
+
+def makeFancyPlot():#{{{
+    """ Set various plotting parameters in one function. """
+    ax=gca()
+    ax.tick_params('both', length=10, width=2, which='major')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.tick_params(axis='both', direction='in')
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
+    tight_layout()#}}}
+
 import matlablike as pys
 #import labrad
 #import synthesize as s
@@ -31,7 +68,7 @@ chirpLength = 10e-6
 timeAxis = pys.r_[0:chirpLength:5e-9]
 freqOffset = 0e6
 freqOffsetArray = pys.r_[-freqOffset:freqOffset: 1j]
-freqWidth =  5e6
+freqWidth =  3e6
 #freqWidth /= 16.
 rate = 2*freqWidth/chirpLength
 # this is the phase modulation
