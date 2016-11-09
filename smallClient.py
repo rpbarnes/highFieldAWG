@@ -15,7 +15,7 @@ serverAddress = ('127.0.0.1',9000) # address to the xepr computer
 #serverAddress = ('localhost',7000) # address to the xepr computer
 sock.connect(serverAddress)
 print "sending %i data values"%len(x)
-sock.send(x)
+sock.send('poop')
 print sock.recv(128)
 sock.close()
 
