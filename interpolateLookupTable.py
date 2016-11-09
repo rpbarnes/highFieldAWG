@@ -28,10 +28,10 @@ threshold = 0.01
 
 ### Input Waveform
 chirpLength = 10e-6
-timeAxis = pys.r_[0:chirpLength:50e-9]
+timeAxis = pys.r_[0:chirpLength:5e-9]
 freqOffset = 0e6
 freqOffsetArray = pys.r_[-freqOffset:freqOffset: 1j]
-freqWidth =    10e6
+freqWidth =  5e6
 #freqWidth /= 16.
 rate = 2*freqWidth/chirpLength
 # this is the phase modulation
