@@ -121,9 +121,9 @@ while True:
                 sram = p.wave2sram(wave)
             sram[0] |= 0x30000000 # add trigger pulse at beginning of sequence
             if not dryRun:
-                p.fpga.dac_run_sram_slave(sram,False)   # This will tell the dac to wait for a trigger before it plays the waveforms.
+                #p.fpga.dac_run_sram_slave(sram,False)   # This will tell the dac to wait for a trigger before it plays the waveforms.
                 #p.fpga.dac_run_sram(sram,False)        # I'm not sure why this guy is here...
-                #p.fpga.dac_run_sram(sram,True)         # This one should continually play through waveforms. *** Ilia try this one.
+                p.fpga.dac_run_sram(sram,True)         # This one should continually play through waveforms. *** Ilia try this one.
             else:
                 print "Dry Run. Did not send wave to DAC "
             print "synthesized waveform"
