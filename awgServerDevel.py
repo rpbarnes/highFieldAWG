@@ -7,7 +7,7 @@ from pylab import *
 import time
 ion()
 
-makePlots = True
+makePlots = False
 phaseScaling = False    # set to False to prevent scaling the phase of waveform by 1/16.
 dwellTime = 1e-9        # set to the dwell time of the FPGA. Must be a multiple of 4 ns.
 localDebug = False      # binds server to local host. False = bound to outside accessible ip. True = bound to localhost.
